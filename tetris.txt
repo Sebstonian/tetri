@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Tetris Moderno</h1>
+    <canvas id="gameCanvas"></canvas>
+    <script src="tetris.js"></script>
+</body>
+</html>
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #1c1c1c;
+    color: #fff;
+}
+
+h1 {
+    position: absolute;
+    top: 20px;
+    font-size: 24px;
+}
+
+#gameCanvas {
+    background-color: #2c2c2c;
+    border: 2px solid #fff;
+}
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const ROW = 20;
+const COL = 10;
+const SQ = 30;
+const VACANT = 'black'; // Color de las celdas vacías
+
+// Ajustar tamaño del canvas
+canvas.width = COL * SQ;
+canvas.height = ROW * SQ;
+
+// Dibujar un cuadrado
+function drawSquare(x, y, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x * SQ, y * SQ, SQ, SQ);
+    ctx.strokeStyle = '#1c1c1c';
+    ctx.strokeRect(x * SQ, y * SQ, SQ, SQ);
+}
+
+// Crear el tablero
+let board = [];
+for (let r = 0; r < ROW; r++) {
+    board[r] = [];
+    for (let c = 0; c < COL; c++) {
+        board[r][c] = VACANT;
+    }
+}
+
+// Dibujar el tablero
+function drawBoard() {
+    for (let r = 0; r < ROW; r++) {
+        for (let c = 0; c < COL; c++) {
+            drawSquare(c, r, board[r][c]);
+        }
+    }
+}
+
+drawBoard();
+
+// Las piezas y sus colores
+const PIECES = [
+    [Z, 'red'],
+    [S, 'green'],
+    [T, 'yellow'],
+    [O, 'blue'],
+    [L, 'purple'],
+    [I, 'cyan'],
+    [J, 'orange']
+];
+
+// Generar una pieza aleatoria
+function randomPiece() {
+    let r = Math.floor(Math.random() * PIECES.length); // 0 -> 6
+    return new Piece(PIECES[r][0], PIECES[r][1]);
+}
+
+let p = randomPiece();
+
+// El Objeto Pieza
+function Piece(tetromino, color) {
+    this.tetromino = tetromino;
+    this.color = color;
+
+    this.tetrominoN = 0; // Comenzar con la primera rotación
+    this.activeTetromino = this.tetromino[this.tetrominoN];
+
+    // Control de las posiciones de las piezas
+    this.x = 3;
+    this.y = -2;
+}
+
+// Dibujar la pieza
+Piece.prototype.draw = function() {
+    for (let r = 0; r < this.activeTetromino.length; r++) {
+        for (let c = 0; c < this.activeTetromino.length; c++) {
+            if (this.activeTetromino[r][c]) {
+                drawSquare(this.x + c, this.y + r, this.color);
+            }
+        }
+    }
+};
+
+// Borrar la pieza
+Piece.prototype.unDraw = function() {
+    for (let r = 0; r < this.activeTetromino.length; r++) {
+        for (let c = 0; c < this.activeTetromino.length; c++) {
+            if (this.activeTetromino[r][c]) {
+                drawSquare(this.x + c, this.y + r, VACANT);
+            }
+        }
+    }
+};
+
+// Mover la pieza hacia abajo
+Piece.prototype.moveDown = function() {
+    if (!this.collision(0, 1, this.activeTetromino)) {
+        this.unDraw();
+        this.y++;
+        this.draw();
+    } else {
+        this.lock();
+        p = randomPiece();
+    }
+};
+
+// Mover la pieza hacia la derecha
+Piece.prototype.moveRight = function() {
+    if (!this.collision(1, 0, this.activeTetromino)) {
+        this.unDraw();
+        this.x++;
+        this.draw();
+    }
+};
+
+// Mover la pieza hacia la izquierda
+Piece.prototype.moveLeft = function() {
+    if (!this.collision(-1, 0, this.activeTetromino)) {
+        this.unDraw();
+        this.x--;
+        this.draw();
+    }
+};
+
+// Rotar la pieza
+Piece.prototype.rotate = function() {
+    let nextPattern = this.tetromino[(this.tetrominoN + 1) % this.tetromino.length];
+    let kick = 0;
+
+    if (this.collision(0, 0, nextPattern)) {
+        if (this.x > COL / 2) {
+            kick = -1; // Mover la pieza hacia la izquierda
+        } else {
+            kick = 1; // Mover la pieza hacia la derecha
+        }
+    }
+
+    if (!this.collision(kick, 0, nextPattern)) {
+        this.unDraw();
+        this.x += kick;
+        this.tetrominoN = (this.tetrominoN + 1) % this.tetromino.length;
+        this.activeTetromino = nextPattern;
+        this.draw();
+    }
+};
+
+// Colisión de la pieza con el tablero
+Piece.prototype.collision = function(x, y, piece) {
+    for (let r = 0; r < piece.length; r++) {
+        for (let c = 0; c < piece.length; c++) {
+            if (!piece[r][c]) {
+                continue;
+            }
+            let newX = this.x + c + x;
+            let newY = this.y + r + y;
+
+            if (newX < 0 || newX >= COL || newY >= ROW) {
+                return true;
+            }
+
+            if (newY < 0) {
+                continue;
+            }
+
+            if (board[newY][newX] != VACANT) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+// Bloquear la pieza y añadir al tablero
+Piece.prototype.lock = function() {
+    for (let r = 0; r < this.activeTetromino.length; r++) {
+        for (let c = 0; c < this.activeTetromino.length; c++) {
+            if (!this.activeTetromino[r][c]) {
+                continue;
+            }
+            if (this.y + r < 0) {
+                alert('Game Over');
+                // Reiniciar el juego
+                board = [];
+                for (let r = 0; r < ROW; r++) {
+                    board[r] = [];
+                    for (let c = 0; c < COL; c++) {
+                        board[r][c] = VACANT;
+                    }
+                }
+                break;
+            }
+            board[this.y + r][this.x + c] = this.color;
+        }
+    }
+    drawBoard();
+};
+
+// Control de las piezas con teclas
+document.addEventListener('keydown', CONTROL);
+
+function CONTROL(event) {
+    if (event.keyCode == 65) { // 'A' para mover a la izquierda
+        p.moveLeft();
+    } else if (event.keyCode == 68) { // 'D' para mover a la derecha
+        p.moveRight();
+    } else if (event.keyCode == 32) { // 'Espacio' para rotar
+        p.rotate();
+    } else if (event.keyCode == 40) { // Flecha abajo para bajar más rápido
+        p.moveDown();
+    }
+}
+
+// Llamar a la función de bajar la pieza cada segundo
+let dropStart = Date.now();
+function drop() {
+    let now = Date.now();
+    let delta = now - dropStart;
+    if (delta > 1000) {
+        p.moveDown();
+        dropStart = Date.now();
+    }
+    requestAnimationFrame(drop);
+}
+
+drop();
+const I = [
+    [
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+    ],
+    [
+        [0, 0, 1, 0],
+        [0, 0, 1, 0],
+        [0, 0, 1, 0],
+        [0, 0, 1, 0]
+    ],
+    // Más rotaciones...
+];
+
+const J = [
+   
